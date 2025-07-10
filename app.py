@@ -138,7 +138,8 @@ def generate_pdf_bytes(fields):
     if not wkpath:
         raise RuntimeError("wkhtmltopdf not found on PATH.")
     cfg = pdfkit.configuration(wkhtmltopdf=wkpath)
-    return pdfkit.from_string(html, False, configuration=cfg,
+    return pdfkit.from_string(html, False,
+                              configuration=cfg,
                               options={"enable-local-file-access": None})
 
 # ─── NAVIGATION ──────────────────────────────────────────────────
@@ -152,6 +153,7 @@ page = st.sidebar.radio(
 # ─── NEW STARTER FORM ────────────────────────────────────────────
 if page == "New Starter":
     st.title("🆕 New Starter Details")
+
     with st.form("new_starter_form"):
         # Supplier Information
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
@@ -209,13 +211,18 @@ if page == "New Starter":
         submitted = st.form_submit_button("📄 Generate PDF")
 
     if submitted:
-        # We store only 15 fields in the DB; logo_b64 is for PDF only
+        # Blank out removed fields
         ni_number, probation_length = "", ""
+
+        # Prepare all fields for the PDF template
         html_fields = {
             "logo_b64":          logo_b64,
             "supplier_name":     supplier_name,
-            "supplier_address":  supplier_address.replace("\n","<br/>"),
             "supplier_contact":  supplier_contact,
+            "supplier_address":  supplier_address.replace("\n","<br/>"),
+            "client_name":       client_name,
+            "client_contact":    client_contact,
+            "client_address":    client_address.replace("\n","<br/>"),
             "employee_name":     employee_name,
             "address":           address.replace("\n","<br/>"),
             "ni_number":         ni_number,
@@ -230,19 +237,16 @@ if page == "New Starter":
             "generated_date":    datetime.today().strftime("%d %B %Y"),
         }
 
-        # Insert into DB (exclude logo_b64)
+        # Insert into DB (exclude logo & client info)
         db_cols = [
-            "supplier_name", "supplier_contact", "supplier_address",
-            "employee_name", "address", "ni_number",
-            "role_position", "department", "start_date",
-            "office_location", "salary_details", "probation_length",
-            "emergency_contact", "additional_info", "generated_date"
+            "supplier_name","supplier_contact","supplier_address",
+            "employee_name","address","ni_number",
+            "role_position","department","start_date",
+            "office_location","salary_details","probation_length",
+            "emergency_contact","additional_info","generated_date"
         ]
         placeholders = ",".join("?" for _ in db_cols)
-        sql = f"""
-          INSERT INTO starters ({','.join(db_cols)})
-          VALUES ({placeholders})
-        """
+        sql = f"INSERT INTO starters ({','.join(db_cols)}) VALUES ({placeholders})"
         c.execute(sql, tuple(html_fields[col] for col in db_cols))
         conn.commit()
 
@@ -289,19 +293,82 @@ elif page == "Starter List":
                     office_location=?,salary_details=?,probation_length=?,
                     emergency_contact=?,additional_info=?,generated_date=?
                   WHERE id=?
-                """, tuple(
-                    row[col] for col in [
+                """, tuple(row[col] for col in [
                         "supplier_name","supplier_contact","supplier_address",
                         "employee_name","address","ni_number",
                         "role_position","department","start_date",
                         "office_location","salary_details","probation_length",
                         "emergency_contact","additional_info","generated_date"
-                    ]
-                ) + (row["id"],))
+                    ]) + (row["id"],))
             conn.commit()
             st.success("✅ All changes saved!")
 
-        # PDF re-generate and full-report features would go here (as before)
+        st.markdown("---")
+        st.subheader("🔄 Re-generate PDF for an Existing Starter")
+        options = {r["id"]: f"{r['employee_name']} (ID {r['id']})" for _, r in df.iterrows()}
+        sel = st.selectbox("Select Starter", list(options), format_func=lambda i: options[i])
+        if st.button("📄 Generate PDF for Selected"):
+            rec = df[df["id"] == sel].iloc[0]
+            # client fields blank on regen
+            html_fields = {
+                "logo_b64":          logo_b64,
+                "supplier_name":     rec["supplier_name"],
+                "supplier_contact":  rec["supplier_contact"],
+                "supplier_address":  rec["supplier_address"].replace("\n","<br/>"),
+                "client_name":       "",
+                "client_contact":    "",
+                "client_address":    "",
+                "employee_name":     rec["employee_name"],
+                "address":           rec["address"].replace("\n","<br/>"),
+                "ni_number":         rec["ni_number"],
+                "role_position":     rec["role_position"],
+                "department":        rec["department"],
+                "start_date":        rec["start_date"],
+                "office_location":   rec["office_location"],
+                "salary_details":    rec["salary_details"],
+                "probation_length":  rec["probation_length"],
+                "emergency_contact": rec["emergency_contact"].replace("\n","<br/>"),
+                "additional_info":   rec["additional_info"].replace("\n","<br/>"),
+                "generated_date":    rec["generated_date"],
+            }
+            try:
+                pdfb = generate_pdf_bytes(html_fields)
+                st.success(f"✅ PDF for {rec['employee_name']} ready!")
+                st.download_button(
+                    "⬇️ Download PDF",
+                    pdfb,
+                    file_name=f"starter_{rec['employee_name'].replace(' ','_')}.pdf",
+                    mime="application/pdf"
+                )
+            except Exception as e:
+                st.error(f"Failed to generate PDF: {e}")
+
+        st.markdown("---")
+        st.subheader("📄 Download Full Starters Report")
+        if st.button("Generate All Starters PDF"):
+            df_all = df.drop(columns=["supplier_name","supplier_contact","supplier_address"])
+            html = "<!DOCTYPE html><html><head><meta charset='utf-8'/><title>All Starters</title>" \
+                   "<style>@page{size:A4 landscape;margin:20mm;}body{font-family:Arial;font-size:12px;}" \
+                   "table{width:100%;border-collapse:collapse;}th,td{border:1px solid#333;padding:6px;}" \
+                   "th{background:#005f8c;color:#fff;}</style></head><body><h1>All Starters Report</h1><table><thead><tr>"
+            for col in df_all.columns:
+                html += f"<th>{col.replace('_',' ').title()}</th>"
+            html += "</tr></thead><tbody>"
+            for _, row in df_all.iterrows():
+                html += "<tr>" + "".join(f"<td>{row[c]}</td>" for c in df_all.columns) + "</tr>"
+            html += "</tbody></table></body></html>"
+            wk = shutil.which("wkhtmltopdf")
+            if not wk:
+                st.error("wkhtmltopdf not found.")
+            else:
+                cfg = pdfkit.configuration(wkhtmltopdf=wk)
+                opts = {"enable-local-file-access": None, "page-size":"A4", "orientation":"Landscape"}
+                try:
+                    pdfb = pdfkit.from_string(html, False, configuration=cfg, options=opts)
+                    st.download_button("⬇️ Download All Starters PDF", pdfb,
+                                       file_name="all_starters_report.pdf", mime="application/pdf")
+                except Exception as e:
+                    st.error(f"PDF generation failed: {e}")
 
 # ─── AI ASSISTANT TAB ─────────────────────────────────────────────
 else:
