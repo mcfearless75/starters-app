@@ -11,16 +11,12 @@ from openai import OpenAI
 
 # ─── OPENAI KEY LOADING ─────────────────────────────────────────
 try:
-    # Try Streamlit secrets.toml
     openai_key = st.secrets["openai"]["key"]
 except Exception:
-    # Fallback to environment variable
     openai_key = os.getenv("OPENAI_API_KEY")
 
 if not openai_key:
-    st.error(
-        "❌ OpenAI API key not found. Please set it in Render as the env var OPENAI_API_KEY."
-    )
+    st.error("❌ OpenAI API key not found. Please set it as OPENAI_API_KEY in your environment.")
     st.stop()
 
 client = OpenAI(api_key=openai_key)
@@ -39,7 +35,7 @@ def ai_query_system(prompt: str, df: pd.DataFrame) -> str:
     )
     return resp.choices[0].message.content.strip()
 
-# ─── PAGE CONFIG & CUSTOM THEME ─────────────────────────────────
+# ─── PAGE CONFIG & THEME ────────────────────────────────────────
 st.set_page_config(page_title="New Starter Details", layout="centered")
 st.markdown("""
 <style>
@@ -84,7 +80,7 @@ CREATE TABLE IF NOT EXISTS starters (
 """)
 conn.commit()
 
-# ─── DUPLICATE CLEANUP ───────────────────────────────────────────
+# ─── CLEAN DUPLICATES ON STARTUP ─────────────────────────────────
 c.execute("""
 DELETE FROM starters
 WHERE id NOT IN (
@@ -99,13 +95,6 @@ WHERE id NOT IN (
 )
 """)
 conn.commit()
-
-# ─── OPTIONAL SEED DATA (COMMENTED OUT) ──────────────────────────
-# test_starters = [ { ... your 10 test dicts ... } ]
-# for rec in test_starters:
-#     c.execute("INSERT INTO starters (...) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-#               tuple(rec[k] for k in rec))
-# conn.commit()
 
 # ─── LOGO ENCODING ───────────────────────────────────────────────
 with open("logo.png", "rb") as f:
@@ -139,8 +128,11 @@ if page == "New Starter":
             supplier_name    = st.text_input("Supplier Name", "PRL Site Solutions")
             supplier_contact = st.text_input("Supplier Contact", "Office")
         with r:
-            supplier_address = st.text_area("Supplier Address",
-                "259 Wallasey village\nWallasey\nCH45 3LR", height=120)
+            supplier_address = st.text_area(
+                "Supplier Address",
+                "259 Wallasey village\nWallasey\nCH45 3LR",
+                height=120
+            )
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("<hr>", unsafe_allow_html=True)
 
@@ -216,16 +208,25 @@ elif page == "Starter List":
     if df.empty:
         st.info("No starters recorded yet.")
     else:
+        # keep original to detect deletions
+        df_orig = df.copy()
+
+        # show editable table
         if hasattr(st, "data_editor"):
             edited = st.data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
-        elif hasattr(st, "experimental_data_editor"):
-            edited = st.experimental_data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
         else:
-            st.warning("Upgrade Streamlit for editable table.")
-            st.table(df)
-            edited = None
+            edited = st.experimental_data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
 
         if edited is not None and st.button("💾 Save changes"):
+            # DELETE rows removed by user
+            orig_ids = set(df_orig["id"])
+            new_ids  = set(edited["id"])
+            to_delete = orig_ids - new_ids
+            if to_delete:
+                c.executemany("DELETE FROM starters WHERE id = ?", [(i,) for i in to_delete])
+                st.write(f"🗑️ Deleted {len(to_delete)} starter(s)")
+
+            # UPDATE remaining rows
             for _, row in edited.iterrows():
                 c.execute("""
                   UPDATE starters SET
@@ -244,7 +245,7 @@ elif page == "Starter List":
                     row["id"]
                 ))
             conn.commit()
-            st.success("All changes saved! 🎉")
+            st.success("✅ All changes saved!")
 
         st.markdown("---")
         st.subheader("🔄 Re-generate PDF for an Existing Starter")
@@ -299,11 +300,11 @@ elif page == "Starter List":
                 st.error("wkhtmltopdf not found.")
             else:
                 cfg = pdfkit.configuration(wkhtmltopdf=wk)
-                opts = {"enable-local-file-access": None,"page-size":"A4","orientation":"Landscape"}
+                opts = {"enable-local-file-access": None, "page-size":"A4", "orientation":"Landscape"}
                 try:
                     pdfb = pdfkit.from_string(html, False, configuration=cfg, options=opts)
                     st.download_button("⬇️ Download All Starters PDF", pdfb,
-                                       file_name="all_starters_report.pdf",mime="application/pdf")
+                                       file_name="all_starters_report.pdf", mime="application/pdf")
                 except Exception as e:
                     st.error(f"PDF generation failed: {e}")
 
