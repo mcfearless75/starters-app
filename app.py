@@ -9,15 +9,20 @@ import streamlit as st
 import shutil
 from openai import OpenAI
 
-# ─── OPENAI CONFIG ──────────────────────────────────────────────
-openai_key = None
-if "openai" in st.secrets and "key" in st.secrets["openai"]:
+# ─── OPENAI KEY LOADING ─────────────────────────────────────────
+try:
+    # Try Streamlit secrets.toml
     openai_key = st.secrets["openai"]["key"]
-else:
+except Exception:
+    # Fallback to environment variable
     openai_key = os.getenv("OPENAI_API_KEY")
+
 if not openai_key:
-    st.error("⚠️ OpenAI API key not found. See README for setup.")
+    st.error(
+        "❌ OpenAI API key not found. Please set it in Render as the env var OPENAI_API_KEY."
+    )
     st.stop()
+
 client = OpenAI(api_key=openai_key)
 
 def ai_query_system(prompt: str, df: pd.DataFrame) -> str:
@@ -34,7 +39,7 @@ def ai_query_system(prompt: str, df: pd.DataFrame) -> str:
     )
     return resp.choices[0].message.content.strip()
 
-# ─── PAGE CONFIG & THEME ────────────────────────────────────────
+# ─── PAGE CONFIG & CUSTOM THEME ─────────────────────────────────
 st.set_page_config(page_title="New Starter Details", layout="centered")
 st.markdown("""
 <style>
@@ -80,7 +85,6 @@ CREATE TABLE IF NOT EXISTS starters (
 conn.commit()
 
 # ─── DUPLICATE CLEANUP ───────────────────────────────────────────
-# Delete any exact-duplicate rows, keep the one with the smallest id
 c.execute("""
 DELETE FROM starters
 WHERE id NOT IN (
@@ -97,14 +101,9 @@ WHERE id NOT IN (
 conn.commit()
 
 # ─── OPTIONAL SEED DATA (COMMENTED OUT) ──────────────────────────
-# test_starters = [
-#     { ... your 10 test dicts ... }
-# ]
+# test_starters = [ { ... your 10 test dicts ... } ]
 # for rec in test_starters:
-#     c.execute("INSERT INTO starters (supplier_name, supplier_contact, supplier_address, "
-#               "employee_name, address, ni_number, role_position, department, start_date, "
-#               "office_location, salary_details, probation_length, emergency_contact, "
-#               "additional_info, generated_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+#     c.execute("INSERT INTO starters (...) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 #               tuple(rec[k] for k in rec))
 # conn.commit()
 
@@ -209,16 +208,14 @@ if page == "New Starter":
         except Exception as e:
             st.error(f"PDF generation failed: {e}")
 
-# ─── STARTER LIST VIEW & FULL REPORT ─────────────────────────────
+# ─── STARTER LIST VIEW ───────────────────────────────────────────
 elif page == "Starter List":
     st.title("📋 Starter List")
     df = pd.read_sql("SELECT * FROM starters", conn)
-    # (dupes already removed at startup)
 
     if df.empty:
         st.info("No starters recorded yet.")
     else:
-        # Editable grid
         if hasattr(st, "data_editor"):
             edited = st.data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
         elif hasattr(st, "experimental_data_editor"):
@@ -238,13 +235,14 @@ elif page == "Starter List":
                     office_location   = ?, salary_details  = ?, probation_length = ?,
                     emergency_contact = ?, additional_info = ?, generated_date   = ?
                   WHERE id = ?
-                """, tuple(row[col] for col in [
-                    "supplier_name","supplier_contact","supplier_address",
-                    "employee_name","address","ni_number",
-                    "role_position","department","start_date",
-                    "office_location","salary_details","probation_length",
-                    "emergency_contact","additional_info","generated_date"
-                ]) + (row["id"],))
+                """, (
+                    row["supplier_name"], row["supplier_contact"], row["supplier_address"],
+                    row["employee_name"],  row["address"],          row["ni_number"],
+                    row["role_position"],  row["department"],       row["start_date"],
+                    row["office_location"],row["salary_details"],   row["probation_length"],
+                    row["emergency_contact"],row["additional_info"],row["generated_date"],
+                    row["id"]
+                ))
             conn.commit()
             st.success("All changes saved! 🎉")
 
@@ -253,14 +251,14 @@ elif page == "Starter List":
         id_to_label = {r["id"]: f"{r['employee_name']} (ID {r['id']})" for _, r in df.iterrows()}
         sel_id = st.selectbox("Select a Starter", options=list(id_to_label), format_func=lambda i: id_to_label[i])
         if st.button("📄 Generate PDF for Selected"):
-            rec = df[df["id"]==sel_id].iloc[0]
+            rec = df[df["id"] == sel_id].iloc[0]
             fields = {
                 "logo_b64":          logo_b64,
                 "supplier_name":     rec["supplier_name"],
-                "supplier_address":  rec["supplier_address"].replace("\n","<br/>"),
+                "supplier_address":  rec["supplier_address"].replace("\n", "<br/>"),
                 "supplier_contact":  rec["supplier_contact"],
                 "employee_name":     rec["employee_name"],
-                "address":           rec["address"].replace("\n","<br/>"),
+                "address":           rec["address"].replace("\n", "<br/>"),
                 "ni_number":         rec["ni_number"],
                 "role_position":     rec["role_position"],
                 "department":        rec["department"],
@@ -268,8 +266,8 @@ elif page == "Starter List":
                 "office_location":   rec["office_location"],
                 "salary_details":    rec["salary_details"],
                 "probation_length":  rec["probation_length"],
-                "emergency_contact": rec["emergency_contact"].replace("\n","<br/>"),
-                "additional_info":   rec["additional_info"].replace("\n","<br/>"),
+                "emergency_contact": rec["emergency_contact"].replace("\n", "<br/>"),
+                "additional_info":   rec["additional_info"].replace("\n", "<br/>"),
                 "generated_date":    rec["generated_date"],
             }
             try:
@@ -288,7 +286,7 @@ elif page == "Starter List":
             html = "<!DOCTYPE html><html><head><meta charset='utf-8'/><title>All Starters</title>" \
                    "<style>@page{size:A4 landscape;margin:20mm;}body{font-family:Arial;font-size:12px;}" \
                    "table{width:100%;border-collapse:collapse;}th,td{border:1px solid#333;padding:6px;}" \
-                   "th{background:#005f8c;color:#fff;}</style></head><body><h1>All Starters</h1><table><thead><tr>"
+                   "th{background:#005f8c;color:#fff;}</style></head><body><h1>All Starters Report</h1><table><thead><tr>"
             for col in df_all.columns:
                 html += f"<th>{col.replace('_',' ').title()}</th>"
             html += "</tr></thead><tbody>"
@@ -309,7 +307,6 @@ elif page == "Starter List":
                 except Exception as e:
                     st.error(f"PDF generation failed: {e}")
 
-# ─── AI ASSISTANT TAB ─────────────────────────────────────────────
 else:
     st.title("🤖 AI Assistant")
     df = pd.read_sql("SELECT * FROM starters", conn)
