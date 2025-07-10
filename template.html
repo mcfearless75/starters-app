@@ -4,7 +4,6 @@
   <meta charset="utf-8"/>
   <title>New Starter Details</title>
   <style>
-    /* ─── GLOBAL ───────────────────────────────────────────────────────── */
     body {
       margin: 20px;
       font-family: Arial, sans-serif;
@@ -12,58 +11,66 @@
       font-size: 11px;
       line-height: 1.4;
     }
-    table { border-collapse: collapse; width: 100%; }
-    th, td {
-      border: 1px solid #444;
-      padding: 6px 8px;
-      vertical-align: top;
-      font-size: 10.5px;
-    }
-    th {
-      background: #e6f2fb;
-      font-weight: 700;
-      text-transform: uppercase;
-      font-size: 10px;
-    }
-
-    /* ─── HEADER BAR ──────────────────────────────────────────────────── */
     .header-bar {
       background: #005f8c;
       color: white;
       padding: 12px 20px;
       border-radius: 4px;
-      margin-bottom: 24px;
       display: flex;
       align-items: center;
+      margin-bottom: 24px;
     }
     .header-bar img {
       height: 50px;
-      margin-right: 12px;
+      margin-right: 15px;
     }
     .header-bar h1 {
-      flex: 1;
       margin: 0;
       font-size: 20px;
-      text-align: right;
       text-transform: uppercase;
       letter-spacing: 1px;
     }
-
-    /* ─── THREE-COLUMN SECTIONS ───────────────────────────────────────── */
-    .section-grid {
+    .section {
+      margin-bottom: 24px;
+    }
+    .section h2 {
+      background: #e6f2fb;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    table.info-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+    }
+    table.info-table th,
+    table.info-table td {
+      border: 1px solid #444;
+      padding: 6px 8px;
+      vertical-align: top;
+      font-size: 10.5px;
+    }
+    table.info-table th {
+      background: #f0f8ff;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 10px;
+    }
+    .two-col {
       display: flex;
       gap: 16px;
-      margin-bottom: 20px;
     }
-    .inner-table {
+    .col {
       flex: 1;
     }
-
-    /* ─── FOOTER NOTE ────────────────────────────────────────────────── */
-    .footer-note {
+    .footer {
       font-size: 9px;
       color: #555;
-      margin-top: 20px;
+      margin-top: 30px;
     }
   </style>
 </head>
@@ -75,57 +82,71 @@
     <h1>New Starter Details</h1>
   </div>
 
-  <!-- SUPPLIER, PERSONAL & POSITION DETAILS -->
-  <div class="section-grid">
-    <div class="inner-table">
-      <table>
-        <tr><th colspan="2">Supplier Information</th></tr>
-        <tr><td style="width:30%;">Supplier Name:</td><td>{{ supplier_name }}</td></tr>
-        <tr><td>Supplier Address:</td><td>{{ supplier_address|safe }}</td></tr>
-        <tr><td>Supplier Contact:</td><td>{{ supplier_contact }}</td></tr>
+  <!-- SUPPLIER -->
+  <div class="section">
+    <h2>🏭 Supplier Information</h2>
+    <table class="info-table">
+      <tr><th>Supplier Name</th><td>{{ supplier_name }}</td></tr>
+      <tr><th>Supplier Contact</th><td>{{ supplier_contact }}</td></tr>
+      <tr><th>Supplier Address</th><td>{{ supplier_address }}</td></tr>
+    </table>
+  </div>
+
+  <!-- CLIENT -->
+  <div class="section">
+    <h2>🤝 Client Information</h2>
+    <table class="info-table">
+      <tr><th>Client Name</th><td>{{ client_name }}</td></tr>
+      <tr><th>Client Contact</th><td>{{ client_contact }}</td></tr>
+      <tr><th>Client Address</th><td>{{ client_address }}</td></tr>
+    </table>
+  </div>
+
+  <!-- CANDIDATE -->
+  <div class="section">
+    <h2>👤 Candidate Information</h2>
+    <div class="two-col">
+      <div class="col">
+        <table class="info-table">
+          <tr><th colspan="2">Personal</th></tr>
+          <tr><td><strong>Name:</strong></td><td>{{ employee_name }}</td></tr>
+          <tr><td><strong>Address:</strong></td><td>{{ address }}</td></tr>
+          <tr><td><strong>NI Number:</strong></td><td>{{ ni_number }}</td></tr>
+        </table>
+      </div>
+      <div class="col">
+        <table class="info-table">
+          <tr><th colspan="2">Position</th></tr>
+          <tr><td><strong>Role:</strong></td><td>{{ role_position }}</td></tr>
+          <tr><td><strong>Department:</strong></td><td>{{ department }}</td></tr>
+          <tr><td><strong>Start Date:</strong></td><td>{{ start_date }}</td></tr>
+          <tr><td><strong>Location:</strong></td><td>{{ office_location }}</td></tr>
+          <tr><td><strong>Salary:</strong></td><td>{{ salary_details }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMERGENCY / ADDITIONAL -->
+  <div class="two-col section">
+    <div class="col">
+      <h2>⚠️ Emergency Contact</h2>
+      <table class="info-table">
+        <tr><td>{{ emergency_contact }}</td></tr>
       </table>
     </div>
-    <div class="inner-table">
-      <table>
-        <tr><th colspan="2">Personal Information</th></tr>
-        <tr><td style="width:30%;">Employee Name:</td><td>{{ employee_name }}</td></tr>
-        <tr><td>Address:</td><td>{{ address|safe }}</td></tr>
-        <tr><td>NI Number:</td><td>{{ ni_number }}</td></tr>
-      </table>
-    </div>
-    <div class="inner-table">
-      <table>
-        <tr><th colspan="2">Position Details</th></tr>
-        <tr><td style="width:30%;">Role / Position:</td><td>{{ role_position }}</td></tr>
-        <tr><td>Department:</td><td>{{ department }}</td></tr>
-        <tr><td>Start Date:</td><td>{{ start_date }}</td></tr>
-        <tr><td>Office Location:</td><td>{{ office_location }}</td></tr>
-        <tr><td>Salary Details:</td><td>{{ salary_details }}</td></tr>
-        <tr><td>Probation Length:</td><td>{{ probation_length }}</td></tr>
+    <div class="col">
+      <h2>📝 Additional Information</h2>
+      <table class="info-table">
+        <tr><td>{{ additional_info }}</td></tr>
       </table>
     </div>
   </div>
 
-  <!-- EMERGENCY CONTACT & ADDITIONAL INFO -->
-  <div class="section-grid">
-    <div class="inner-table">
-      <table>
-        <tr><th>Emergency Contact Info</th></tr>
-        <tr><td>{{ emergency_contact|safe }}</td></tr>
-      </table>
-    </div>
-    <div class="inner-table">
-      <table>
-        <tr><th>Additional Information</th></tr>
-        <tr><td>{{ additional_info|safe }}</td></tr>
-      </table>
-    </div>
-  </div>
-
-  <!-- FOOTER NOTE -->
-  <p class="footer-note">
+  <!-- FOOTER -->
+  <div class="footer">
     Generated on {{ generated_date }}.
-  </p>
+  </div>
 
 </body>
 </html>
