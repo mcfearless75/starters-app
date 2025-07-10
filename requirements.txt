@@ -1,0 +1,6 @@
+streamlit
+pandas
+jinja2
+pdfkit
+openai
+pillow

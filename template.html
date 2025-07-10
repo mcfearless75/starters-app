@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>New Starter Details</title>
+  <style>
+    /* ─── GLOBAL ───────────────────────────────────────────────────────── */
+    body {
+      margin: 20px;
+      font-family: Arial, sans-serif;
+      color: #222;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    table { border-collapse: collapse; width: 100%; }
+    th, td {
+      border: 1px solid #444;
+      padding: 6px 8px;
+      vertical-align: top;
+      font-size: 10.5px;
+    }
+    th {
+      background: #e6f2fb;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 10px;
+    }
+
+    /* ─── HEADER BAR ──────────────────────────────────────────────────── */
+    .header-bar {
+      background: #005f8c;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 4px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+    }
+    .header-bar img {
+      height: 50px;
+      margin-right: 12px;
+    }
+    .header-bar h1 {
+      flex: 1;
+      margin: 0;
+      font-size: 20px;
+      text-align: right;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ─── THREE-COLUMN SECTIONS ───────────────────────────────────────── */
+    .section-grid {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .inner-table {
+      flex: 1;
+    }
+
+    /* ─── FOOTER NOTE ────────────────────────────────────────────────── */
+    .footer-note {
+      font-size: 9px;
+      color: #555;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header-bar">
+    <img src="data:image/png;base64,{{ logo_b64 }}" alt="Logo">
+    <h1>New Starter Details</h1>
+  </div>
+
+  <!-- SUPPLIER, PERSONAL & POSITION DETAILS -->
+  <div class="section-grid">
+    <div class="inner-table">
+      <table>
+        <tr><th colspan="2">Supplier Information</th></tr>
+        <tr><td style="width:30%;">Supplier Name:</td><td>{{ supplier_name }}</td></tr>
+        <tr><td>Supplier Address:</td><td>{{ supplier_address|safe }}</td></tr>
+        <tr><td>Supplier Contact:</td><td>{{ supplier_contact }}</td></tr>
+      </table>
+    </div>
+    <div class="inner-table">
+      <table>
+        <tr><th colspan="2">Personal Information</th></tr>
+        <tr><td style="width:30%;">Employee Name:</td><td>{{ employee_name }}</td></tr>
+        <tr><td>Address:</td><td>{{ address|safe }}</td></tr>
+        <tr><td>NI Number:</td><td>{{ ni_number }}</td></tr>
+      </table>
+    </div>
+    <div class="inner-table">
+      <table>
+        <tr><th colspan="2">Position Details</th></tr>
+        <tr><td style="width:30%;">Role / Position:</td><td>{{ role_position }}</td></tr>
+        <tr><td>Department:</td><td>{{ department }}</td></tr>
+        <tr><td>Start Date:</td><td>{{ start_date }}</td></tr>
+        <tr><td>Office Location:</td><td>{{ office_location }}</td></tr>
+        <tr><td>Salary Details:</td><td>{{ salary_details }}</td></tr>
+        <tr><td>Probation Length:</td><td>{{ probation_length }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- EMERGENCY CONTACT & ADDITIONAL INFO -->
+  <div class="section-grid">
+    <div class="inner-table">
+      <table>
+        <tr><th>Emergency Contact Info</th></tr>
+        <tr><td>{{ emergency_contact|safe }}</td></tr>
+      </table>
+    </div>
+    <div class="inner-table">
+      <table>
+        <tr><th>Additional Information</th></tr>
+        <tr><td>{{ additional_info|safe }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOOTER NOTE -->
+  <p class="footer-note">
+    Generated on {{ generated_date }}.
+  </p>
+
+</body>
+</html>
