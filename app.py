@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS starters (
 """)
 conn.commit()
 
-# ─── CLEAN DUPLICATES ON STARTUP ─────────────────────────────────
+# Remove any exact duplicate rows on startup
 c.execute("""
 DELETE FROM starters
 WHERE id NOT IN (
@@ -115,44 +115,71 @@ def generate_pdf_bytes(fields):
 
 # ─── NAVIGATION ──────────────────────────────────────────────────
 st.sidebar.title("🔀 Navigation")
-page = st.sidebar.radio("", ["New Starter", "Starter List", "🤖 AI Assistant"])
+page = st.sidebar.radio(
+    "Navigation",
+    ["New Starter", "Starter List", "🤖 AI Assistant"],
+    label_visibility="collapsed"
+)
 
 # ─── NEW STARTER FORM ────────────────────────────────────────────
 if page == "New Starter":
     st.title("🆕 New Starter Details")
+
     with st.form("new_starter_form"):
+        # Supplier Information
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 🏢 Supplier Information")
-        l, r = st.columns([1,2])
-        with l:
+        left, right = st.columns([1, 2])
+        with left:
             supplier_name    = st.text_input("Supplier Name", "PRL Site Solutions")
             supplier_contact = st.text_input("Supplier Contact", "Office")
-        with r:
+        with right:
             supplier_address = st.text_area(
                 "Supplier Address",
                 "259 Wallasey village\nWallasey\nCH45 3LR",
                 height=120
             )
         st.markdown('</div>', unsafe_allow_html=True)
+
         st.markdown("<hr>", unsafe_allow_html=True)
 
+        # Client Information
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown("## 🏢 Client Information")
+        cleft, cright = st.columns([1, 2])
+        with cleft:
+            client_name    = st.text_input("Client Name")
+            client_contact = st.text_input("Client Contact")
+        with cright:
+            client_address = st.text_area(
+                "Client Address",
+                height=120
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("<hr>", unsafe_allow_html=True)
+
+        # Candidate Information
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 👤 Candidate Information")
         c1, c2 = st.columns(2)
         with c1:
             employee_name = st.text_input("Employee Name")
             address       = st.text_area("Address", height=100)
-            ni_number     = st.text_input("NI Number")
+            # NI Number removed per request
         with c2:
-            role_position    = st.text_input("Role / Position")
-            department       = st.text_input("Department")
-            start_date       = st.date_input("Start Date")
-            office_location  = st.text_input("Office Location")
-            salary_details   = st.text_input("Salary Details")
-            probation_length = st.text_input("Probation Length")
+            role_position  = st.text_input("Role / Position")
+            department     = st.text_input("Department")
+            start_date     = st.date_input("Start Date")
+            office_location= st.text_input("Office Location")
+            # Salary as free-form
+            salary_details = st.text_area("Salary Details", height=60)
+            # Probation Length removed per request
         st.markdown('</div>', unsafe_allow_html=True)
+
         st.markdown("<hr>", unsafe_allow_html=True)
 
+        # Emergency & Additional
         with st.expander("📝 Emergency & Additional Information", expanded=False):
             e1, e2 = st.columns(2)
             with e1:
@@ -163,11 +190,16 @@ if page == "New Starter":
         submitted = st.form_submit_button("📄 Generate PDF")
 
     if submitted:
+        # supply empty strings for removed fields
+        ni_number        = ""
+        probation_length = ""
+
         fields = {
             "logo_b64":          logo_b64,
             "supplier_name":     supplier_name,
             "supplier_address":  supplier_address.replace("\n","<br/>"),
             "supplier_contact":  supplier_contact,
+            # client info not stored in DB or PDF template
             "employee_name":     employee_name,
             "address":           address.replace("\n","<br/>"),
             "ni_number":         ni_number,
@@ -181,6 +213,7 @@ if page == "New Starter":
             "additional_info":   additional_info.replace("\n","<br/>"),
             "generated_date":    datetime.today().strftime("%d %B %Y"),
         }
+        # insert into DB (blank ni_number & probation_length)
         c.execute("""
           INSERT INTO starters (
             supplier_name, supplier_contact, supplier_address,
@@ -191,6 +224,7 @@ if page == "New Starter":
           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, tuple(fields[k] for k in fields))
         conn.commit()
+
         try:
             pdfb = generate_pdf_bytes(fields)
             st.success("✅ PDF created!")
@@ -208,25 +242,19 @@ elif page == "Starter List":
     if df.empty:
         st.info("No starters recorded yet.")
     else:
-        # keep original to detect deletions
         df_orig = df.copy()
-
-        # show editable table
         if hasattr(st, "data_editor"):
             edited = st.data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
         else:
             edited = st.experimental_data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
 
         if edited is not None and st.button("💾 Save changes"):
-            # DELETE rows removed by user
             orig_ids = set(df_orig["id"])
             new_ids  = set(edited["id"])
             to_delete = orig_ids - new_ids
             if to_delete:
                 c.executemany("DELETE FROM starters WHERE id = ?", [(i,) for i in to_delete])
                 st.write(f"🗑️ Deleted {len(to_delete)} starter(s)")
-
-            # UPDATE remaining rows
             for _, row in edited.iterrows():
                 c.execute("""
                   UPDATE starters SET
@@ -280,34 +308,7 @@ elif page == "Starter List":
             except Exception as e:
                 st.error(f"Failed to generate PDF: {e}")
 
-        st.markdown("---")
-        st.subheader("📄 Download Full Starters Report")
-        if st.button("Generate All Starters PDF"):
-            df_all = df.drop(columns=["supplier_name","supplier_contact","supplier_address"])
-            html = "<!DOCTYPE html><html><head><meta charset='utf-8'/><title>All Starters</title>" \
-                   "<style>@page{size:A4 landscape;margin:20mm;}body{font-family:Arial;font-size:12px;}" \
-                   "table{width:100%;border-collapse:collapse;}th,td{border:1px solid#333;padding:6px;}" \
-                   "th{background:#005f8c;color:#fff;}</style></head><body><h1>All Starters Report</h1><table><thead><tr>"
-            for col in df_all.columns:
-                html += f"<th>{col.replace('_',' ').title()}</th>"
-            html += "</tr></thead><tbody>"
-            for _, row in df_all.iterrows():
-                html += "<tr>" + "".join(f"<td>{row[c]}</td>" for c in df_all.columns) + "</tr>"
-            html += "</tbody></table></body></html>"
-
-            wk = shutil.which("wkhtmltopdf")
-            if not wk:
-                st.error("wkhtmltopdf not found.")
-            else:
-                cfg = pdfkit.configuration(wkhtmltopdf=wk)
-                opts = {"enable-local-file-access": None, "page-size":"A4", "orientation":"Landscape"}
-                try:
-                    pdfb = pdfkit.from_string(html, False, configuration=cfg, options=opts)
-                    st.download_button("⬇️ Download All Starters PDF", pdfb,
-                                       file_name="all_starters_report.pdf", mime="application/pdf")
-                except Exception as e:
-                    st.error(f"PDF generation failed: {e}")
-
+# ─── AI ASSISTANT TAB ─────────────────────────────────────────────
 else:
     st.title("🤖 AI Assistant")
     df = pd.read_sql("SELECT * FROM starters", conn)
