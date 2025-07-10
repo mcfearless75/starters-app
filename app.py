@@ -116,12 +116,12 @@ page = st.sidebar.radio(
 if page == "New Starter":
     st.title("🆕 New Starter Details")
 
-    # 1) load up clients for dropdown
-    clients_df = pd.read_sql("SELECT * FROM clients ORDER BY name", conn)
+    # 1) load clients for dropdown
+    clients_df     = pd.read_sql("SELECT * FROM clients ORDER BY name", conn)
     client_options = ["<New Client>"] + clients_df["name"].tolist()
 
     with st.form("new_starter_form"):
-        # Supplier card
+        # Supplier
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 🏢 Supplier Information")
         l, r = st.columns([1,1])
@@ -129,11 +129,13 @@ if page == "New Starter":
             supplier_name    = st.text_input("Supplier Name","PRL Site Solutions")
             supplier_contact = st.text_input("Supplier Contact","Office")
         with r:
-            supplier_address = st.text_area("Supplier Address","259 Wallasey village\nWallasey\nCH45 3LR",height=120)
+            supplier_address = st.text_area("Supplier Address",
+                                            "259 Wallasey village\nWallasey\nCH45 3LR",
+                                            height=120)
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # Client card (dropdown + autofill)
+        # Client (dropdown + autofill)
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 🏢 Client Information")
         sel = st.selectbox("Choose a client:", client_options)
@@ -147,11 +149,11 @@ if page == "New Starter":
             client_name    = st.text_input("Client Name", client_name)
             client_contact = st.text_input("Client Contact", client_contact)
         with cr:
-            client_address = st.text_area("Client Address",client_address,height=120)
+            client_address = st.text_area("Client Address", client_address, height=120)
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # Candidate card
+        # Candidate
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 👤 Candidate Information")
         c1, c2 = st.columns(2)
@@ -167,18 +169,18 @@ if page == "New Starter":
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # Emergency & additional
-        with st.expander("📝 Emergency & Additional Information",expanded=False):
-            e1,e2 = st.columns(2)
+        # Emergency & Additional
+        with st.expander("📝 Emergency & Additional Information", expanded=False):
+            e1, e2 = st.columns(2)
             with e1:
                 emergency_contact = st.text_area("Emergency Contact Info",height=120)
             with e2:
-                additional_info   = st.text_area("Additional Information",height=120)
+                additional_info   = st.text_area("Additional Information", height=120)
 
         submitted = st.form_submit_button("📄 Generate PDF")
 
     if submitted:
-        # 2) if new client chosen, save it & REFRESH
+        # 2) save new client if needed, then force rerun
         if sel == "<New Client>" and client_name.strip():
             c.execute(
                 "INSERT OR IGNORE INTO clients(name,contact,address) VALUES (?,?,?)",
@@ -186,37 +188,37 @@ if page == "New Starter":
             )
             conn.commit()
             st.success("✅ New client saved — reloading client list…")
-            # try built-in rerun, else fallback to private RerunException
-            if hasattr(st, "experimental_rerun"):
+            # try the built-in rerun, else fallback to RerunException
+            try:
                 st.experimental_rerun()
-            else:
+            except Exception:
                 from streamlit.runtime.scriptrunner.script_runner import RerunException
                 raise RerunException()
 
-        # 3) proceed to save starter & PDF
+        # 3) proceed to save starter & generate PDF
         ni_number, probation_length = "", ""
         html_fields = {
-            "logo_b64":logo_b64,
-            "supplier_name":supplier_name,
-            "supplier_contact":supplier_contact,
-            "supplier_address":supplier_address.replace("\n","<br/>"),
-            "client_name":client_name,
-            "client_contact":client_contact,
-            "client_address":client_address.replace("\n","<br/>"),
-            "employee_name":employee_name,
-            "address":address.replace("\n","<br/>"),
-            "ni_number":ni_number,
-            "role_position":role_position,
-            "department":department,
-            "start_date":start_date.strftime("%d %B %Y"),
-            "office_location":office_location,
-            "salary_details":salary_details,
-            "probation_length":probation_length,
-            "emergency_contact":emergency_contact.replace("\n","<br/>"),
-            "additional_info":additional_info.replace("\n","<br/>"),
-            "generated_date":datetime.today().strftime("%d %B %Y"),
+            "logo_b64":          logo_b64,
+            "supplier_name":     supplier_name,
+            "supplier_contact":  supplier_contact,
+            "supplier_address":  supplier_address.replace("\n","<br/>"),
+            "client_name":       client_name,
+            "client_contact":    client_contact,
+            "client_address":    client_address.replace("\n","<br/>"),
+            "employee_name":     employee_name,
+            "address":           address.replace("\n","<br/>"),
+            "ni_number":         ni_number,
+            "role_position":     role_position,
+            "department":        department,
+            "start_date":        start_date.strftime("%d %B %Y"),
+            "office_location":   office_location,
+            "salary_details":    salary_details,
+            "probation_length":  probation_length,
+            "emergency_contact": emergency_contact.replace("\n","<br/>"),
+            "additional_info":   additional_info.replace("\n","<br/>"),
+            "generated_date":    datetime.today().strftime("%d %B %Y"),
         }
-        # insert starter record
+        # insert into starters table
         db_cols = [
           "supplier_name","supplier_contact","supplier_address",
           "employee_name","address","ni_number",
@@ -226,16 +228,17 @@ if page == "New Starter":
         ]
         placeholders = ",".join("?" for _ in db_cols)
         sql = f"INSERT INTO starters ({','.join(db_cols)}) VALUES ({placeholders})"
-        c.execute(sql, tuple(html_fields[c] for c in db_cols))
+        c.execute(sql, tuple(html_fields[col] for col in db_cols))
         conn.commit()
 
+        # Generate & offer PDF
         try:
             pdfb = generate_pdf_bytes(html_fields)
             st.success("✅ PDF created!")
-            st.download_button("⬇️ Download PDF",pdfb,
+            st.download_button("⬇️ Download PDF", pdfb,
                 file_name=f"new_starter_{employee_name.replace(' ','_')}.pdf",
                 mime="application/pdf")
         except Exception as e:
             st.error(f"PDF generation failed: {e}")
 
-# ─── ... your Starter List & AI Assistant tabs follow unchanged ...
+# ─── The rest of your “Starter List” & “AI Assistant” tabs remain unchanged. ───
