@@ -22,28 +22,66 @@ client = OpenAI(api_key=openai_key)
 def ai_query_system(prompt: str, df: pd.DataFrame) -> str:
     data_json = df.to_json(orient="records")
     messages = [
-        {"role": "system",  "content": "You are a savvy HR data analyst."},
-        {"role": "user",    "content": f"{prompt}\n\nHere is the starters data:\n{data_json}"}
+        {"role": "system", "content": "You are a savvy HR data analyst."},
+        {"role": "user", "content": f"{prompt}\n\nHere is the starters data:\n{data_json}"}
     ]
     resp = client.chat.completions.create(
         model="gpt-4", messages=messages, temperature=0.2, max_tokens=500
     )
     return resp.choices[0].message.content.strip()
 
-# ─── PAGE CONFIG & THEME ────────────────────────────────────────
+# ─── PAGE CONFIG & CUSTOM THEME ─────────────────────────────────
 st.set_page_config(page_title="New Starter Details", layout="centered")
 st.markdown("""
 <style>
-div.block-container { max-width:1800px!important; padding:3rem!important; }
-.section-card { background:#fff; border-radius:8px; padding:24px; margin-bottom:24px;
-  box-shadow:0 2px 12px rgba(0,0,0,0.15); }
-.section-card h2 { margin-top:0; color:#005f8c; font-size:1.4rem; }
-.css-1r6slb0.e1fqkh3o2, .css-1urxts9.e1fqkh3o2 { margin-bottom:1.25rem; }
-hr { border:none; border-top:2px dashed #555!important; margin:2rem 0!important; }
-div[data-testid="stDataEditor"] .ag-root-wrapper { font-size:24px!important; line-height:1.6!important; }
-div[data-testid="stDataEditor"] .ag-header-cell-text { font-size:26px!important; font-weight:700!important; }
-div[data-testid="stDataEditor"] .ag-cell { padding:20px!important; }
-div[data-testid="stDataEditor"] .ag-row { min-height:60px!important; }
+/* ─── NARROWER PAGE ────────────────────────────────────────── */
+div.block-container {
+    max-width: 1200px !important;
+    padding: 3rem !important;
+}
+
+/* ─── CARDS ─────────────────────────────────────────────────── */
+.section-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+}
+.section-card h2 {
+    margin-top: 0;
+    color: #005f8c;
+    font-size: 1.4rem;
+}
+
+/* ─── FORM FIELDS ───────────────────────────────────────────── */
+.css-1r6slb0.e1fqkh3o2,
+.css-1urxts9.e1fqkh3o2 {
+    margin-bottom: 1.25rem;
+}
+
+/* ─── SEPARATORS ───────────────────────────────────────────── */
+hr {
+    border: none;
+    border-top: 2px dashed #555 !important;
+    margin: 2rem 0 !important;
+}
+
+/* ─── DATA EDITOR ──────────────────────────────────────────── */
+div[data-testid="stDataEditor"] .ag-root-wrapper {
+    font-size: 24px!important;
+    line-height: 1.6!important;
+}
+div[data-testid="stDataEditor"] .ag-header-cell-text {
+    font-size: 26px!important;
+    font-weight: 700!important;
+}
+div[data-testid="stDataEditor"] .ag-cell {
+    padding: 20px!important;
+}
+div[data-testid="stDataEditor"] .ag-row {
+    min-height: 60px!important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,16 +91,26 @@ c    = conn.cursor()
 c.execute("""
 CREATE TABLE IF NOT EXISTS starters (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
-  supplier_name     TEXT,  supplier_contact  TEXT,  supplier_address  TEXT,
-  employee_name     TEXT,  address           TEXT,  ni_number         TEXT,
-  role_position     TEXT,  department        TEXT,  start_date        TEXT,
-  office_location   TEXT,  salary_details    TEXT,  probation_length  TEXT,
-  emergency_contact TEXT,  additional_info   TEXT,  generated_date    TEXT
+  supplier_name     TEXT,
+  supplier_contact  TEXT,
+  supplier_address  TEXT,
+  employee_name     TEXT,
+  address           TEXT,
+  ni_number         TEXT,
+  role_position     TEXT,
+  department        TEXT,
+  start_date        TEXT,
+  office_location   TEXT,
+  salary_details    TEXT,
+  probation_length  TEXT,
+  emergency_contact TEXT,
+  additional_info   TEXT,
+  generated_date    TEXT
 )
 """)
 conn.commit()
 
-# ─── DUPLICATE CLEANUP ───────────────────────────────────────────
+# ─── DUPLICATE CLEANUP ─────────────────────────────────────────
 c.execute("""
 DELETE FROM starters
 WHERE id NOT IN (
@@ -79,7 +127,7 @@ WHERE id NOT IN (
 conn.commit()
 
 # ─── LOGO ENCODING ───────────────────────────────────────────────
-with open("logo.png","rb") as f:
+with open("logo.png", "rb") as f:
     logo_b64 = base64.b64encode(f.read()).decode()
 
 def generate_pdf_bytes(fields):
@@ -93,7 +141,7 @@ def generate_pdf_bytes(fields):
     return pdfkit.from_string(html, False, configuration=cfg,
                               options={"enable-local-file-access": None})
 
-# ─── NAVIGATION ─────────────────────────────────────────────────
+# ─── NAVIGATION ──────────────────────────────────────────────────
 st.sidebar.title("🔀 Navigation")
 page = st.sidebar.radio(
     "Navigation",
@@ -104,16 +152,15 @@ page = st.sidebar.radio(
 # ─── NEW STARTER FORM ────────────────────────────────────────────
 if page == "New Starter":
     st.title("🆕 New Starter Details")
-
     with st.form("new_starter_form"):
         # Supplier Information
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 🏢 Supplier Information")
-        l, r = st.columns([1, 2])
-        with l:
+        left, right = st.columns([1, 1])
+        with left:
             supplier_name    = st.text_input("Supplier Name", "PRL Site Solutions")
             supplier_contact = st.text_input("Supplier Contact", "Office")
-        with r:
+        with right:
             supplier_address = st.text_area(
                 "Supplier Address",
                 "259 Wallasey village\nWallasey\nCH45 3LR",
@@ -125,11 +172,11 @@ if page == "New Starter":
         # Client Information
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 🏢 Client Information")
-        cl, cr = st.columns([1, 2])
-        with cl:
+        cleft, cright = st.columns([1, 1])
+        with cleft:
             client_name    = st.text_input("Client Name")
             client_contact = st.text_input("Client Contact")
-        with cr:
+        with cright:
             client_address = st.text_area("Client Address", height=120)
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("<hr>", unsafe_allow_html=True)
@@ -146,11 +193,11 @@ if page == "New Starter":
             department     = st.text_input("Department")
             start_date     = st.date_input("Start Date")
             office_location= st.text_input("Office Location")
-            salary_details = st.text_area("Salary Details", height=80)  # <-- height ≥ 68
+            salary_details = st.text_area("Salary Details", height=80)
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # Emergency & Additional
+        # Emergency & Additional Information
         with st.expander("📝 Emergency & Additional Information", expanded=False):
             e1, e2 = st.columns(2)
             with e1:
@@ -158,13 +205,13 @@ if page == "New Starter":
             with e2:
                 additional_info   = st.text_area("Additional Information", height=120)
 
-        # **Submit** button (inside form!)
+        # Submit button (inside the form)
         submitted = st.form_submit_button("📄 Generate PDF")
 
-    # Only runs after Submit
     if submitted:
+        # We store only 15 fields in the DB; logo_b64 is for PDF only
         ni_number, probation_length = "", ""
-        fields = {
+        html_fields = {
             "logo_b64":          logo_b64,
             "supplier_name":     supplier_name,
             "supplier_address":  supplier_address.replace("\n","<br/>"),
@@ -183,27 +230,36 @@ if page == "New Starter":
             "generated_date":    datetime.today().strftime("%d %B %Y"),
         }
 
-        c.execute("""
-          INSERT INTO starters (
-            supplier_name, supplier_contact, supplier_address,
-            employee_name, address, ni_number,
-            role_position, department, start_date,
-            office_location, salary_details, probation_length,
-            emergency_contact, additional_info, generated_date
-          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, tuple(fields[k] for k in fields))
+        # Insert into DB (exclude logo_b64)
+        db_cols = [
+            "supplier_name", "supplier_contact", "supplier_address",
+            "employee_name", "address", "ni_number",
+            "role_position", "department", "start_date",
+            "office_location", "salary_details", "probation_length",
+            "emergency_contact", "additional_info", "generated_date"
+        ]
+        placeholders = ",".join("?" for _ in db_cols)
+        sql = f"""
+          INSERT INTO starters ({','.join(db_cols)})
+          VALUES ({placeholders})
+        """
+        c.execute(sql, tuple(html_fields[col] for col in db_cols))
         conn.commit()
 
+        # Generate & download PDF
         try:
-            pdfb = generate_pdf_bytes(fields)
+            pdfb = generate_pdf_bytes(html_fields)
             st.success("✅ PDF created!")
-            st.download_button("⬇️ Download PDF", pdfb,
+            st.download_button(
+                "⬇️ Download PDF",
+                pdfb,
                 file_name=f"new_starter_{employee_name.replace(' ','_')}.pdf",
-                mime="application/pdf")
+                mime="application/pdf"
+            )
         except Exception as e:
             st.error(f"PDF generation failed: {e}")
 
-# ─── STARTER LIST & CRUD ────────────────────────────────────────
+# ─── STARTER LIST VIEW & CRUD ───────────────────────────────────
 elif page == "Starter List":
     st.title("📋 Starter List")
     df = pd.read_sql("SELECT * FROM starters", conn)
@@ -223,7 +279,7 @@ elif page == "Starter List":
             if to_delete:
                 c.executemany("DELETE FROM starters WHERE id = ?", [(i,) for i in to_delete])
                 st.write(f"🗑️ Deleted {len(to_delete)} starter(s)")
-            # UPDATE remaining
+            # UPDATE remaining rows
             for _, row in edited.iterrows():
                 c.execute("""
                   UPDATE starters SET
@@ -245,9 +301,9 @@ elif page == "Starter List":
             conn.commit()
             st.success("✅ All changes saved!")
 
-        # … (PDF re-generate & full-report code unchanged) …
+        # PDF re-generate and full-report features would go here (as before)
 
-# ─── AI ASSISTANT ───────────────────────────────────────────────
+# ─── AI ASSISTANT TAB ─────────────────────────────────────────────
 else:
     st.title("🤖 AI Assistant")
     df = pd.read_sql("SELECT * FROM starters", conn)
