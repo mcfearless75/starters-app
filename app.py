@@ -23,8 +23,8 @@ client = OpenAI(api_key=openai_key)
 def ai_query_system(prompt: str, df: pd.DataFrame) -> str:
     data_json = df.to_json(orient="records")
     messages = [
-        {"role":"system", "content":"You are a savvy HR data analyst."},
-        {"role":"user",   "content":f"{prompt}\n\nHere is the starters data:\n{data_json}"}
+        {"role":"system","content":"You are a savvy HR data analyst."},
+        {"role":"user",  "content":f"{prompt}\n\nHere is the starters data:\n{data_json}"}
     ]
     resp = client.chat.completions.create(
         model="gpt-4", messages=messages, temperature=0.2, max_tokens=500
@@ -176,7 +176,7 @@ if page == "New Starter":
         submitted = st.form_submit_button("📄 Generate PDF")
 
     if submitted:
-        # If a brand-new client, save & ask user to refresh
+        # If new client, save & stop
         if sel == "<New Client>" and client_name.strip():
             c.execute(
                 "INSERT OR IGNORE INTO clients(name,contact,address) VALUES (?,?,?)",
@@ -257,19 +257,31 @@ elif page == "Add Client":
             conn.commit()
             st.success(f"✅ Client “{client_name}” added! Navigate to New Starter to use it.")
 
-# ─── STARTER LIST & AI ASSISTANT TABS (unchanged) ───────────────
+# ─── STARTER LIST ────────────────────────────────────────────────
 elif page == "Starter List":
     st.title("📋 Starter List")
     df = pd.read_sql("SELECT * FROM starters", conn)
+
     if df.empty:
         st.info("No starters recorded yet.")
     else:
-        edited = st.experimental_data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
-        if st.button("💾 Save changes"):
-            df_orig = pd.read_sql("SELECT * FROM starters", conn)
-            to_delete = set(df_orig["id"]) - set(edited["id"])
+        # robust editor fallback
+        if hasattr(st, "data_editor"):
+            edited = st.data_editor(df, use_container_width=True, height=800)
+        elif hasattr(st, "experimental_data_editor"):
+            edited = st.experimental_data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
+        else:
+            st.warning("Interactive editing requires Streamlit ≥1.24.0; showing read‐only table.")
+            st.dataframe(df, use_container_width=True)
+            edited = None
+
+        if edited is not None and st.button("💾 Save changes"):
+            # handle deletions
+            orig = pd.read_sql("SELECT * FROM starters", conn)
+            to_delete = set(orig["id"]) - set(edited["id"])
             if to_delete:
                 c.executemany("DELETE FROM starters WHERE id=?", [(i,) for i in to_delete])
+            # handle updates
             for _, row in edited.iterrows():
                 c.execute("""
                   UPDATE starters SET
@@ -283,6 +295,7 @@ elif page == "Starter List":
             conn.commit()
             st.success("✅ All changes saved!")
 
+# ─── AI ASSISTANT ────────────────────────────────────────────────
 else:
     st.title("🤖 AI Assistant")
     df = pd.read_sql("SELECT * FROM starters", conn)
