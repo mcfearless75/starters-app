@@ -40,40 +40,27 @@ div.block-container { max-width:1200px!important; padding:3rem!important; }
 .section-card h2 { margin-top:0; color:#005f8c; font-size:1.4rem; }
 .css-1r6slb0.e1fqkh3o2, .css-1urxts9.e1fqkh3o2 { margin-bottom:1.25rem; }
 hr { border:none; border-top:2px dashed #555!important; margin:2rem 0!important; }
-div[data-testid="stDataEditor"] .ag-root-wrapper { font-size:24px!important; line-height:1.6!important; }
-div[data-testid="stDataEditor"] .ag-header-cell-text { font-size:26px!important; font-weight:700!important; }
-div[data-testid="stDataEditor"] .ag-cell { padding:20px!important; }
-div[data-testid="stDataEditor"] .ag-row { min-height:60px!important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── DATABASE SETUP ─────────────────────────────────────────────
+# ─── DB SETUP ────────────────────────────────────────────────────
 conn = sqlite3.connect("starters.db", check_same_thread=False)
-c    = conn.cursor()
-
-# Starters table
-c.execute("""
-CREATE TABLE IF NOT EXISTS starters (
-  id                INTEGER PRIMARY KEY AUTOINCREMENT,
-  supplier_name     TEXT, supplier_contact  TEXT, supplier_address TEXT,
-  employee_name     TEXT, address           TEXT, ni_number        TEXT,
-  role_position     TEXT, department        TEXT, start_date       TEXT,
-  office_location   TEXT, salary_details    TEXT, probation_length TEXT,
-  emergency_contact TEXT, additional_info   TEXT, generated_date   TEXT
-)
-""")
-# Clients table
-c.execute("""
-CREATE TABLE IF NOT EXISTS clients (
-  id      INTEGER PRIMARY KEY AUTOINCREMENT,
-  name    TEXT UNIQUE,
-  contact TEXT,
-  address TEXT
-)
-""")
+c = conn.cursor()
+c.execute("""CREATE TABLE IF NOT EXISTS starters (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  supplier_name TEXT, supplier_contact TEXT, supplier_address TEXT,
+  employee_name TEXT, address TEXT, ni_number TEXT,
+  role_position TEXT, department TEXT, start_date TEXT,
+  office_location TEXT, salary_details TEXT, probation_length TEXT,
+  emergency_contact TEXT, additional_info TEXT, generated_date TEXT
+)""")
+c.execute("""CREATE TABLE IF NOT EXISTS clients (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE, contact TEXT, address TEXT
+)""")
 conn.commit()
 
-# Deduplicate starters
+# ─── DEDUPE ──────────────────────────────────────────────────────
 c.execute("""
 DELETE FROM starters
 WHERE id NOT IN (
@@ -89,74 +76,71 @@ WHERE id NOT IN (
 """)
 conn.commit()
 
-# ─── LOGO ENCODING ───────────────────────────────────────────────
+# ─── LOGO ────────────────────────────────────────────────────────
 with open("logo.png","rb") as f:
     logo_b64 = base64.b64encode(f.read()).decode()
 
 def generate_pdf_bytes(fields):
-    env    = Environment(loader=FileSystemLoader("."))
-    tpl    = env.get_template("template.html")
-    html   = tpl.render(**fields)
-    wkpath = shutil.which("wkhtmltopdf")
-    if not wkpath:
-        raise RuntimeError("wkhtmltopdf not found on PATH.")
-    cfg = pdfkit.configuration(wkhtmltopdf=wkpath)
+    env  = Environment(loader=FileSystemLoader("."))
+    tpl  = env.get_template("template.html")
+    html = tpl.render(**fields)
+    wk   = shutil.which("wkhtmltopdf")
+    if not wk:
+        raise RuntimeError("wkhtmltopdf not found")
+    cfg = pdfkit.configuration(wkhtmltopdf=wk)
     return pdfkit.from_string(html, False, configuration=cfg,
-                              options={"enable-local-file-access": None})
+                              options={"enable-local-file-access":None})
 
 # ─── NAVIGATION ──────────────────────────────────────────────────
 st.sidebar.title("🔀 Navigation")
-page = st.sidebar.radio(
-    "Navigation",
+page = st.sidebar.radio("Navigation",
     ["New Starter","Starter List","🤖 AI Assistant"],
     label_visibility="collapsed"
 )
 
-# ─── NEW STARTER FORM ────────────────────────────────────────────
-if page == "New Starter":
+# ─── NEW STARTER ─────────────────────────────────────────────────
+if page=="New Starter":
     st.title("🆕 New Starter Details")
 
-    # 1) load clients for dropdown
+    # load clients
     clients_df     = pd.read_sql("SELECT * FROM clients ORDER BY name", conn)
     client_options = ["<New Client>"] + clients_df["name"].tolist()
 
     with st.form("new_starter_form"):
         # Supplier
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-card">',unsafe_allow_html=True)
         st.markdown("## 🏢 Supplier Information")
-        l, r = st.columns([1,1])
+        l,r = st.columns([1,1])
         with l:
             supplier_name    = st.text_input("Supplier Name","PRL Site Solutions")
             supplier_contact = st.text_input("Supplier Contact","Office")
         with r:
-            supplier_address = st.text_area("Supplier Address",
-                                            "259 Wallasey village\nWallasey\nCH45 3LR",
-                                            height=120)
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("<hr>", unsafe_allow_html=True)
+            supplier_address = st.text_area("Supplier Address","259 Wallasey village\nWallasey\nCH45 3LR",height=120)
+        st.markdown("</div>",unsafe_allow_html=True)
+        st.markdown("<hr>",unsafe_allow_html=True)
 
-        # Client (dropdown + autofill)
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        # Client
+        st.markdown('<div class="section-card">',unsafe_allow_html=True)
         st.markdown("## 🏢 Client Information")
         sel = st.selectbox("Choose a client:", client_options)
-        if sel != "<New Client>":
+        if sel!="<New Client>":
             row = clients_df[clients_df["name"]==sel].iloc[0]
-            client_name, client_contact, client_address = sel, row["contact"], row["address"]
+            client_name,client_contact,client_address = sel,row["contact"],row["address"]
         else:
-            client_name = client_contact = client_address = ""
-        cl, cr = st.columns([1,1])
+            client_name=client_contact=client_address=""
+        cl,cr = st.columns([1,1])
         with cl:
-            client_name    = st.text_input("Client Name", client_name)
-            client_contact = st.text_input("Client Contact", client_contact)
+            client_name    = st.text_input("Client Name",client_name)
+            client_contact = st.text_input("Client Contact",client_contact)
         with cr:
-            client_address = st.text_area("Client Address", client_address, height=120)
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("<hr>", unsafe_allow_html=True)
+            client_address = st.text_area("Client Address",client_address,height=120)
+        st.markdown("</div>",unsafe_allow_html=True)
+        st.markdown("<hr>",unsafe_allow_html=True)
 
         # Candidate
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<div class="section-card">',unsafe_allow_html=True)
         st.markdown("## 👤 Candidate Information")
-        c1, c2 = st.columns(2)
+        c1,c2 = st.columns(2)
         with c1:
             employee_name = st.text_input("Employee Name")
             address       = st.text_area("Address",height=100)
@@ -166,79 +150,74 @@ if page == "New Starter":
             start_date     = st.date_input("Start Date")
             office_location= st.text_input("Office Location")
             salary_details = st.text_area("Salary Details",height=80)
-        st.markdown("</div>", unsafe_allow_html=True)
-        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("</div>",unsafe_allow_html=True)
+        st.markdown("<hr>",unsafe_allow_html=True)
 
         # Emergency & Additional
-        with st.expander("📝 Emergency & Additional Information", expanded=False):
-            e1, e2 = st.columns(2)
-            with e1:
-                emergency_contact = st.text_area("Emergency Contact Info",height=120)
-            with e2:
-                additional_info   = st.text_area("Additional Information", height=120)
+        with st.expander("📝 Emergency & Additional Info",expanded=False):
+            e1,e2 = st.columns(2)
+            with e1: emergency_contact = st.text_area("Emergency Contact Info",height=120)
+            with e2: additional_info   = st.text_area("Additional Information",height=120)
 
         submitted = st.form_submit_button("📄 Generate PDF")
 
     if submitted:
-        # 2) save new client if needed, then force rerun
-        if sel == "<New Client>" and client_name.strip():
+        # save new client & rerun
+        if sel=="<New Client>" and client_name.strip():
             c.execute(
-                "INSERT OR IGNORE INTO clients(name,contact,address) VALUES (?,?,?)",
-                (client_name, client_contact, client_address)
+              "INSERT OR IGNORE INTO clients(name,contact,address) VALUES(?,?,?)",
+              (client_name,client_contact,client_address)
             )
             conn.commit()
-            st.success("✅ New client saved — reloading client list…")
-            # try the built-in rerun, else fallback to RerunException
-            try:
-                st.experimental_rerun()
-            except Exception:
-                from streamlit.runtime.scriptrunner.script_runner import RerunException
-                raise RerunException()
+            st.success("✅ New client saved — please refresh to update list.")
+            st.stop()
 
-        # 3) proceed to save starter & generate PDF
-        ni_number, probation_length = "", ""
+        # prepare PDF fields
+        ni_no=prob_len=""
         html_fields = {
-            "logo_b64":          logo_b64,
-            "supplier_name":     supplier_name,
-            "supplier_contact":  supplier_contact,
-            "supplier_address":  supplier_address.replace("\n","<br/>"),
-            "client_name":       client_name,
-            "client_contact":    client_contact,
-            "client_address":    client_address.replace("\n","<br/>"),
-            "employee_name":     employee_name,
-            "address":           address.replace("\n","<br/>"),
-            "ni_number":         ni_number,
-            "role_position":     role_position,
-            "department":        department,
-            "start_date":        start_date.strftime("%d %B %Y"),
-            "office_location":   office_location,
-            "salary_details":    salary_details,
-            "probation_length":  probation_length,
-            "emergency_contact": emergency_contact.replace("\n","<br/>"),
-            "additional_info":   additional_info.replace("\n","<br/>"),
-            "generated_date":    datetime.today().strftime("%d %B %Y"),
+            "logo_b64":logo_b64,
+            "supplier_name":supplier_name,
+            "supplier_contact":supplier_contact,
+            "supplier_address":supplier_address.replace("\n","<br/>"),
+            "client_name":client_name,
+            "client_contact":client_contact,
+            "client_address":client_address.replace("\n","<br/>"),
+            "employee_name":employee_name,
+            "address":address.replace("\n","<br/>"),
+            "ni_number":ni_no,
+            "role_position":role_position,
+            "department":department,
+            "start_date":start_date.strftime("%d %B %Y"),
+            "office_location":office_location,
+            "salary_details":salary_details,
+            "probation_length":prob_len,
+            "emergency_contact":emergency_contact.replace("\n","<br/>"),
+            "additional_info":additional_info.replace("\n","<br/>"),
+            "generated_date":datetime.today().strftime("%d %B %Y")
         }
-        # insert into starters table
-        db_cols = [
+
+        # insert starter
+        cols = [
           "supplier_name","supplier_contact","supplier_address",
           "employee_name","address","ni_number",
           "role_position","department","start_date",
           "office_location","salary_details","probation_length",
           "emergency_contact","additional_info","generated_date"
         ]
-        placeholders = ",".join("?" for _ in db_cols)
-        sql = f"INSERT INTO starters ({','.join(db_cols)}) VALUES ({placeholders})"
-        c.execute(sql, tuple(html_fields[col] for col in db_cols))
+        ph = ",".join("?" for _ in cols)
+        sql= f"INSERT INTO starters({','.join(cols)}) VALUES({ph})"
+        c.execute(sql,tuple(html_fields[c] for c in cols))
         conn.commit()
 
-        # Generate & offer PDF
+        # generate PDF
         try:
-            pdfb = generate_pdf_bytes(html_fields)
+            pdfb=generate_pdf_bytes(html_fields)
             st.success("✅ PDF created!")
-            st.download_button("⬇️ Download PDF", pdfb,
-                file_name=f"new_starter_{employee_name.replace(' ','_')}.pdf",
-                mime="application/pdf")
+            st.download_button("⬇️ Download PDF",pdfb,
+              file_name=f"new_starter_{employee_name.replace(' ','_')}.pdf",
+              mime="application/pdf")
         except Exception as e:
             st.error(f"PDF generation failed: {e}")
 
-# ─── The rest of your “Starter List” & “AI Assistant” tabs remain unchanged. ───
+# ─── LIST & AI TABS UNCHANGED ───────────────────────────────────
+
