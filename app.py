@@ -43,24 +43,31 @@ hr { border:none; border-top:2px dashed #555!important; margin:2rem 0!important;
 </style>
 """, unsafe_allow_html=True)
 
-# ─── DB SETUP ────────────────────────────────────────────────────
+# ─── DATABASE SETUP ─────────────────────────────────────────────
 conn = sqlite3.connect("starters.db", check_same_thread=False)
 c = conn.cursor()
-c.execute("""CREATE TABLE IF NOT EXISTS starters (
+
+# Starters table
+c.execute("""
+CREATE TABLE IF NOT EXISTS starters (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   supplier_name TEXT, supplier_contact TEXT, supplier_address TEXT,
   employee_name TEXT, address TEXT, ni_number TEXT,
   role_position TEXT, department TEXT, start_date TEXT,
   office_location TEXT, salary_details TEXT, probation_length TEXT,
   emergency_contact TEXT, additional_info TEXT, generated_date TEXT
-)""")
-c.execute("""CREATE TABLE IF NOT EXISTS clients (
+)
+""")
+# Clients table
+c.execute("""
+CREATE TABLE IF NOT EXISTS clients (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT UNIQUE, contact TEXT, address TEXT
-)""")
+)
+""")
 conn.commit()
 
-# ─── DEDUPE ──────────────────────────────────────────────────────
+# Deduplicate starters
 c.execute("""
 DELETE FROM starters
 WHERE id NOT IN (
@@ -76,7 +83,7 @@ WHERE id NOT IN (
 """)
 conn.commit()
 
-# ─── LOGO ────────────────────────────────────────────────────────
+# ─── LOGO ENCODING ───────────────────────────────────────────────
 with open("logo.png","rb") as f:
     logo_b64 = base64.b64encode(f.read()).decode()
 
@@ -86,138 +93,205 @@ def generate_pdf_bytes(fields):
     html = tpl.render(**fields)
     wk   = shutil.which("wkhtmltopdf")
     if not wk:
-        raise RuntimeError("wkhtmltopdf not found")
+        raise RuntimeError("wkhtmltopdf not found on PATH.")
     cfg = pdfkit.configuration(wkhtmltopdf=wk)
     return pdfkit.from_string(html, False, configuration=cfg,
                               options={"enable-local-file-access":None})
 
 # ─── NAVIGATION ──────────────────────────────────────────────────
 st.sidebar.title("🔀 Navigation")
-page = st.sidebar.radio("Navigation",
-    ["New Starter","Starter List","🤖 AI Assistant"],
+page = st.sidebar.radio(
+    "Navigation",
+    ["New Starter", "Add Client", "Starter List", "🤖 AI Assistant"],
     label_visibility="collapsed"
 )
 
-# ─── NEW STARTER ─────────────────────────────────────────────────
-if page=="New Starter":
+# ─── NEW STARTER FORM ────────────────────────────────────────────
+if page == "New Starter":
     st.title("🆕 New Starter Details")
 
-    # load clients
+    # load clients for dropdown
     clients_df     = pd.read_sql("SELECT * FROM clients ORDER BY name", conn)
     client_options = ["<New Client>"] + clients_df["name"].tolist()
 
     with st.form("new_starter_form"):
-        # Supplier
-        st.markdown('<div class="section-card">',unsafe_allow_html=True)
+        # Supplier Information
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 🏢 Supplier Information")
-        l,r = st.columns([1,1])
+        l, r = st.columns([1, 1])
         with l:
-            supplier_name    = st.text_input("Supplier Name","PRL Site Solutions")
-            supplier_contact = st.text_input("Supplier Contact","Office")
+            supplier_name    = st.text_input("Supplier Name", "PRL Site Solutions")
+            supplier_contact = st.text_input("Supplier Contact", "Office")
         with r:
-            supplier_address = st.text_area("Supplier Address","259 Wallasey village\nWallasey\nCH45 3LR",height=120)
-        st.markdown("</div>",unsafe_allow_html=True)
-        st.markdown("<hr>",unsafe_allow_html=True)
+            supplier_address = st.text_area(
+                "Supplier Address",
+                "259 Wallasey village\nWallasey\nCH45 3LR",
+                height=120
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
 
-        # Client
-        st.markdown('<div class="section-card">',unsafe_allow_html=True)
+        # Client Information
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 🏢 Client Information")
         sel = st.selectbox("Choose a client:", client_options)
-        if sel!="<New Client>":
+        if sel != "<New Client>":
             row = clients_df[clients_df["name"]==sel].iloc[0]
-            client_name,client_contact,client_address = sel,row["contact"],row["address"]
+            client_name, client_contact, client_address = sel, row["contact"], row["address"]
         else:
-            client_name=client_contact=client_address=""
-        cl,cr = st.columns([1,1])
+            client_name = client_contact = client_address = ""
+        cl, cr = st.columns([1, 1])
         with cl:
-            client_name    = st.text_input("Client Name",client_name)
-            client_contact = st.text_input("Client Contact",client_contact)
+            client_name    = st.text_input("Client Name", client_name)
+            client_contact = st.text_input("Client Contact", client_contact)
         with cr:
-            client_address = st.text_area("Client Address",client_address,height=120)
-        st.markdown("</div>",unsafe_allow_html=True)
-        st.markdown("<hr>",unsafe_allow_html=True)
+            client_address = st.text_area("Client Address", client_address, height=120)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
 
-        # Candidate
-        st.markdown('<div class="section-card">',unsafe_allow_html=True)
+        # Candidate Information
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.markdown("## 👤 Candidate Information")
-        c1,c2 = st.columns(2)
+        c1, c2 = st.columns(2)
         with c1:
             employee_name = st.text_input("Employee Name")
-            address       = st.text_area("Address",height=100)
+            address       = st.text_area("Address", height=100)
         with c2:
             role_position  = st.text_input("Role / Position")
             department     = st.text_input("Department")
             start_date     = st.date_input("Start Date")
             office_location= st.text_input("Office Location")
-            salary_details = st.text_area("Salary Details",height=80)
-        st.markdown("</div>",unsafe_allow_html=True)
-        st.markdown("<hr>",unsafe_allow_html=True)
+            salary_details = st.text_area("Salary Details", height=80)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
 
         # Emergency & Additional
-        with st.expander("📝 Emergency & Additional Info",expanded=False):
-            e1,e2 = st.columns(2)
-            with e1: emergency_contact = st.text_area("Emergency Contact Info",height=120)
-            with e2: additional_info   = st.text_area("Additional Information",height=120)
+        with st.expander("📝 Emergency & Additional Information", expanded=False):
+            e1, e2 = st.columns(2)
+            with e1:
+                emergency_contact = st.text_area("Emergency Contact Info", height=120)
+            with e2:
+                additional_info   = st.text_area("Additional Information", height=120)
 
         submitted = st.form_submit_button("📄 Generate PDF")
 
     if submitted:
-        # save new client & rerun
-        if sel=="<New Client>" and client_name.strip():
+        # If a brand-new client, save & ask user to refresh
+        if sel == "<New Client>" and client_name.strip():
             c.execute(
-              "INSERT OR IGNORE INTO clients(name,contact,address) VALUES(?,?,?)",
-              (client_name,client_contact,client_address)
+                "INSERT OR IGNORE INTO clients(name,contact,address) VALUES (?,?,?)",
+                (client_name.strip(), client_contact.strip(), client_address.strip())
             )
             conn.commit()
             st.success("✅ New client saved — please refresh to update list.")
             st.stop()
 
-        # prepare PDF fields
-        ni_no=prob_len=""
+        # Prepare PDF fields
+        ni_number, probation_length = "", ""
         html_fields = {
-            "logo_b64":logo_b64,
-            "supplier_name":supplier_name,
-            "supplier_contact":supplier_contact,
-            "supplier_address":supplier_address.replace("\n","<br/>"),
-            "client_name":client_name,
-            "client_contact":client_contact,
-            "client_address":client_address.replace("\n","<br/>"),
-            "employee_name":employee_name,
-            "address":address.replace("\n","<br/>"),
-            "ni_number":ni_no,
-            "role_position":role_position,
-            "department":department,
-            "start_date":start_date.strftime("%d %B %Y"),
-            "office_location":office_location,
-            "salary_details":salary_details,
-            "probation_length":prob_len,
-            "emergency_contact":emergency_contact.replace("\n","<br/>"),
-            "additional_info":additional_info.replace("\n","<br/>"),
-            "generated_date":datetime.today().strftime("%d %B %Y")
+            "logo_b64":          logo_b64,
+            "supplier_name":     supplier_name,
+            "supplier_contact":  supplier_contact,
+            "supplier_address":  supplier_address.replace("\n","<br/>"),
+            "client_name":       client_name,
+            "client_contact":    client_contact,
+            "client_address":    client_address.replace("\n","<br/>"),
+            "employee_name":     employee_name,
+            "address":           address.replace("\n","<br/>"),
+            "ni_number":         ni_number,
+            "role_position":     role_position,
+            "department":        department,
+            "start_date":        start_date.strftime("%d %B %Y"),
+            "office_location":   office_location,
+            "salary_details":    salary_details,
+            "probation_length":  probation_length,
+            "emergency_contact": emergency_contact.replace("\n","<br/>"),
+            "additional_info":   additional_info.replace("\n","<br/>"),
+            "generated_date":    datetime.today().strftime("%d %B %Y"),
         }
 
-        # insert starter
-        cols = [
-          "supplier_name","supplier_contact","supplier_address",
-          "employee_name","address","ni_number",
-          "role_position","department","start_date",
-          "office_location","salary_details","probation_length",
-          "emergency_contact","additional_info","generated_date"
+        # Insert starter record
+        db_cols = [
+            "supplier_name","supplier_contact","supplier_address",
+            "employee_name","address","ni_number",
+            "role_position","department","start_date",
+            "office_location","salary_details","probation_length",
+            "emergency_contact","additional_info","generated_date"
         ]
-        ph = ",".join("?" for _ in cols)
-        sql= f"INSERT INTO starters({','.join(cols)}) VALUES({ph})"
-        c.execute(sql,tuple(html_fields[c] for c in cols))
+        placeholders = ",".join("?" for _ in db_cols)
+        sql = f"INSERT INTO starters ({','.join(db_cols)}) VALUES ({placeholders})"
+        c.execute(sql, tuple(html_fields[col] for col in db_cols))
         conn.commit()
 
-        # generate PDF
+        # Generate & download PDF
         try:
-            pdfb=generate_pdf_bytes(html_fields)
+            pdfb = generate_pdf_bytes(html_fields)
             st.success("✅ PDF created!")
-            st.download_button("⬇️ Download PDF",pdfb,
-              file_name=f"new_starter_{employee_name.replace(' ','_')}.pdf",
-              mime="application/pdf")
+            st.download_button(
+                "⬇️ Download PDF",
+                pdfb,
+                file_name=f"new_starter_{employee_name.replace(' ','_')}.pdf",
+                mime="application/pdf"
+            )
         except Exception as e:
             st.error(f"PDF generation failed: {e}")
 
-# ─── LIST & AI TABS UNCHANGED ───────────────────────────────────
+# ─── ADD CLIENT PAGE ─────────────────────────────────────────────
+elif page == "Add Client":
+    st.title("➕ Add Client")
 
+    with st.form("add_client_form"):
+        client_name    = st.text_input("Client Name")
+        client_contact = st.text_input("Contact")
+        client_address = st.text_area("Address", height=120)
+        submitted      = st.form_submit_button("💾 Save Client")
+
+    if submitted:
+        if not client_name.strip():
+            st.error("Please enter a client name.")
+        else:
+            c.execute(
+                "INSERT OR IGNORE INTO clients(name,contact,address) VALUES (?,?,?)",
+                (client_name.strip(), client_contact.strip(), client_address.strip())
+            )
+            conn.commit()
+            st.success(f"✅ Client “{client_name}” added! Navigate to New Starter to use it.")
+
+# ─── STARTER LIST & AI ASSISTANT TABS (unchanged) ───────────────
+elif page == "Starter List":
+    st.title("📋 Starter List")
+    df = pd.read_sql("SELECT * FROM starters", conn)
+    if df.empty:
+        st.info("No starters recorded yet.")
+    else:
+        edited = st.experimental_data_editor(df, use_container_width=True, height=800, num_rows="dynamic")
+        if st.button("💾 Save changes"):
+            df_orig = pd.read_sql("SELECT * FROM starters", conn)
+            to_delete = set(df_orig["id"]) - set(edited["id"])
+            if to_delete:
+                c.executemany("DELETE FROM starters WHERE id=?", [(i,) for i in to_delete])
+            for _, row in edited.iterrows():
+                c.execute("""
+                  UPDATE starters SET
+                    supplier_name=?,supplier_contact=?,supplier_address=?,
+                    employee_name=?,address=?,ni_number=?,
+                    role_position=?,department=?,start_date=?,
+                    office_location=?,salary_details=?,probation_length=?,
+                    emergency_contact=?,additional_info=?,generated_date=?
+                  WHERE id=?
+                """, tuple(row[col] for col in db_cols) + (row["id"],))
+            conn.commit()
+            st.success("✅ All changes saved!")
+
+else:
+    st.title("🤖 AI Assistant")
+    df = pd.read_sql("SELECT * FROM starters", conn)
+    st.dataframe(df, use_container_width=True, height=250)
+    user_prompt = st.text_area("Your question for GPT-4", height=120)
+    if st.button("Ask AI"):
+        if not user_prompt.strip():
+            st.error("Enter a question.")
+        else:
+            answer = ai_query_system(user_prompt, df)
+            st.markdown("### 🤖 GPT-4 says:")
+            st.write(answer)
